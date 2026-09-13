@@ -1,0 +1,14 @@
+{
+  "name": "invoice-duplicate-finder",
+  "version": "0.1.0",
+  "description": "Finds likely duplicate invoice line items across a batch of invoices",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
