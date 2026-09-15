@@ -5,3 +5,4 @@ export {
   parseIsoDate,
   clusterByDateWindow,
 } from './duplicates';
+export { parseInvoiceLineItemsFromCsv, parseInvoiceLineItemsFromJson } from './loader';

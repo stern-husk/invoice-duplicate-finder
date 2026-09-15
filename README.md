@@ -87,12 +87,37 @@ identical, and their invoice dates fall within `windowDays` of each other
 in a chained run (so three re-billed charges a week apart each still land
 in one group, even though the first and third are two weeks apart).
 
+## Loading real invoice exports
+
+`findDuplicateLineItems` takes `InvoiceLineItem[]` directly, but exports
+usually arrive as CSV or JSON. Two parsers turn raw text into that shape:
+
+```ts
+import { parseInvoiceLineItemsFromCsv, parseInvoiceLineItemsFromJson } from './src/index';
+
+const csvText = readFileSync('export.csv', 'utf8');
+const lineItems = parseInvoiceLineItemsFromCsv(csvText);
+
+const jsonText = readFileSync('export.json', 'utf8');
+const lineItems2 = parseInvoiceLineItemsFromJson(jsonText);
+```
+
+`parseInvoiceLineItemsFromCsv` expects a header row with column names
+matching `InvoiceLineItem`'s fields (`invoiceId`, `lineId`, `description`,
+`quantity`, `unitAmount`, `amount`, `invoiceDate`); column order and extra
+columns don't matter, and quoted fields with embedded commas are handled.
+`parseInvoiceLineItemsFromJson` accepts either a top-level array or an
+object with an `items` array. Both throw with a row/item number on the
+first invalid record instead of silently skipping bad data.
+
 ## API
 
 - `findDuplicateLineItems(items, options?)` — the main entry point.
 - `normalizeDescription(text)` — the normalization used for matching.
 - `clusterByDateWindow(items, windowDays)` — groups items by date proximity.
 - `parseIsoDate(dateStr)` — parses and validates an ISO date string.
+- `parseInvoiceLineItemsFromCsv(csvText)` — parses a CSV export into line items.
+- `parseInvoiceLineItemsFromJson(jsonText)` — parses a JSON export into line items.
 
 Every function here is pure: no I/O, no mutation of its arguments, same
 input always gives the same output. That's what makes them easy to unit
@@ -108,4 +133,6 @@ npm run build
 
 ## Status
 
-Early skeleton. Core matching logic works; no CLI or file loader yet.
+Core matching logic and CSV/JSON parsing both work; no CLI yet, and
+matching is still exact (no amount tolerance, no fuzzy description
+matching).
