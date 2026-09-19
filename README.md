@@ -76,16 +76,23 @@ and comparing them never runs into rounding noise.
 findDuplicateLineItems(lineItems, {
   windowDays: 7,               // default 30: how many days apart still counts as "close"
   requireDifferentInvoice: false, // default true: also flag repeats within one invoice
+  amountToleranceCents: 50,    // default 0: also flag amounts within 50 cents of each other
 });
 ```
 
 ## What counts as a match
 
 Two line items match when, after normalizing (lowercase, punctuation
-stripped, whitespace collapsed), their descriptions and amounts are
-identical, and their invoice dates fall within `windowDays` of each other
-in a chained run (so three re-billed charges a week apart each still land
-in one group, even though the first and third are two weeks apart).
+stripped, whitespace collapsed), their descriptions are identical, their
+amounts are within `amountToleranceCents` of each other (0 by default,
+meaning exact), and their invoice dates fall within `windowDays` of each
+other in a chained run (so three re-billed charges a week apart each
+still land in one group, even though the first and third are two weeks
+apart). Amount matching chains the same way: a run of near-equal amounts
+each within tolerance of its neighbor lands in one group, even if the
+smallest and largest in that run are more than `amountToleranceCents`
+apart. When a group's amounts aren't all identical, its `key` reports the
+range (e.g. `consulting march::250000-250050`) instead of a single value.
 
 ## Loading real invoice exports
 
@@ -133,6 +140,6 @@ npm run build
 
 ## Status
 
-Core matching logic and CSV/JSON parsing both work; no CLI yet, and
-matching is still exact (no amount tolerance, no fuzzy description
-matching).
+Core matching logic and CSV/JSON parsing both work, including amount
+tolerance for near-duplicate amounts. No CLI yet, no test suite yet, and
+description matching is still exact (no fuzzy matching).

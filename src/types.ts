@@ -34,6 +34,13 @@ export interface DuplicateDetectionOptions {
    * entries for two different days).
    */
   requireDifferentInvoice: boolean;
+  /**
+   * Two amounts count as matching if they're within this many cents of
+   * each other. Defaults to 0 (exact match only). A small tolerance
+   * catches re-billed charges that pick up a rounding adjustment or a
+   * partial credit between the original and the duplicate.
+   */
+  amountToleranceCents: number;
 }
 
 export interface DuplicateGroup {

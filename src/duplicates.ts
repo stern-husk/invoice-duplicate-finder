@@ -3,6 +3,7 @@ import { DuplicateDetectionOptions, DuplicateGroup, InvoiceLineItem } from './ty
 const DEFAULT_OPTIONS: DuplicateDetectionOptions = {
   windowDays: 30,
   requireDifferentInvoice: true,
+  amountToleranceCents: 0,
 };
 
 /**
@@ -63,14 +64,12 @@ export function clusterByDateWindow(
   return clusters;
 }
 
-function matchKey(item: InvoiceLineItem): string {
-  return `${normalizeDescription(item.description)}::${item.amount}`;
-}
-
-function groupByMatchKey(items: readonly InvoiceLineItem[]): Map<string, InvoiceLineItem[]> {
+function groupByNormalizedDescription(
+  items: readonly InvoiceLineItem[]
+): Map<string, InvoiceLineItem[]> {
   const groups = new Map<string, InvoiceLineItem[]>();
   for (const item of items) {
-    const key = matchKey(item);
+    const key = normalizeDescription(item.description);
     const existing = groups.get(key);
     if (existing) {
       existing.push(item);
@@ -81,14 +80,53 @@ function groupByMatchKey(items: readonly InvoiceLineItem[]): Map<string, Invoice
   return groups;
 }
 
+/**
+ * Splits a set of same-description items into clusters where each item's
+ * amount is within toleranceCents of its neighbor in the amount-sorted
+ * run. Sorting by amount first (rather than comparing every pair) means
+ * the chain only breaks at genuine gaps, and with toleranceCents = 0 this
+ * reproduces exact-amount grouping regardless of input order.
+ */
+function clusterByAmountTolerance(
+  items: readonly InvoiceLineItem[],
+  toleranceCents: number
+): InvoiceLineItem[][] {
+  const sorted = [...items].sort((a, b) => a.amount - b.amount);
+
+  const clusters: InvoiceLineItem[][] = [];
+  let current: InvoiceLineItem[] = [];
+
+  for (const item of sorted) {
+    const prev = current[current.length - 1];
+    if (prev && item.amount - prev.amount > toleranceCents) {
+      clusters.push(current);
+      current = [];
+    }
+    current.push(item);
+  }
+  if (current.length > 0) {
+    clusters.push(current);
+  }
+  return clusters;
+}
+
 function countDistinctInvoices(items: readonly InvoiceLineItem[]): number {
   return new Set(items.map((item) => item.invoiceId)).size;
 }
 
+function groupKey(descriptionKey: string, cluster: readonly InvoiceLineItem[]): string {
+  const amounts = cluster.map((item) => item.amount);
+  const min = Math.min(...amounts);
+  const max = Math.max(...amounts);
+  const amountLabel = min === max ? `${min}` : `${min}-${max}`;
+  return `${descriptionKey}::${amountLabel}`;
+}
+
 /**
  * Finds line items that are likely the same charge billed more than
- * once: same normalized description, same amount, and close together in
- * time. Returns one group per cluster of two or more matching items.
+ * once: same normalized description, a matching amount (exact by
+ * default, or within amountToleranceCents), and close together in time.
+ * Returns one group per cluster of two or more matching items.
  */
 export function findDuplicateLineItems(
   items: readonly InvoiceLineItem[],
@@ -97,15 +135,20 @@ export function findDuplicateLineItems(
   const opts: DuplicateDetectionOptions = { ...DEFAULT_OPTIONS, ...options };
   const groups: DuplicateGroup[] = [];
 
-  for (const [key, sameKeyItems] of groupByMatchKey(items)) {
-    for (const cluster of clusterByDateWindow(sameKeyItems, opts.windowDays)) {
-      if (cluster.length < 2) {
-        continue;
+  for (const [descriptionKey, sameDescriptionItems] of groupByNormalizedDescription(items)) {
+    for (const amountCluster of clusterByAmountTolerance(
+      sameDescriptionItems,
+      opts.amountToleranceCents
+    )) {
+      for (const cluster of clusterByDateWindow(amountCluster, opts.windowDays)) {
+        if (cluster.length < 2) {
+          continue;
+        }
+        if (opts.requireDifferentInvoice && countDistinctInvoices(cluster) < 2) {
+          continue;
+        }
+        groups.push({ key: groupKey(descriptionKey, cluster), items: cluster });
       }
-      if (opts.requireDifferentInvoice && countDistinctInvoices(cluster) < 2) {
-        continue;
-      }
-      groups.push({ key, items: cluster });
     }
   }
 
