@@ -138,8 +138,19 @@ npm install
 npm run build
 ```
 
+## Testing
+
+```
+npm test
+```
+
+Tests live under `test/` as plain JavaScript and run against the compiled
+`dist/` output with Node's built-in test runner (`node:test`), so there's
+no test framework dependency to install.
+
 ## Status
 
 Core matching logic and CSV/JSON parsing both work, including amount
-tolerance for near-duplicate amounts. No CLI yet, no test suite yet, and
+tolerance for near-duplicate amounts, and are covered by a test suite for
+clustering, normalization, and loader edge cases. No CLI yet, and
 description matching is still exact (no fuzzy matching).
